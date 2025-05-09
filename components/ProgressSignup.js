@@ -31,6 +31,10 @@ export default function ProgressSignup({ accountId }) {
     sellerAccount: null,
     checkAccount: null,
   })
+  // Add state for user ID validation
+  const [accountDetails, setAccountDetails] = useState(null)
+  const [showUserIdModal, setShowUserIdModal] = useState(false)
+  const [userId, setUserId] = useState("")
 
   // Use refs to keep track of the latest progress data without triggering re-renders
   const progressRef = useRef(null)
@@ -41,6 +45,65 @@ export default function ProgressSignup({ accountId }) {
     firstListing: 3, // Hours
     sellerAccount: 2, // Hours
     checkAccount: 5 / 60, // 5 minutes in hours
+  }
+
+  // Fetch account details to check User ID
+  const fetchAccountDetails = async () => {
+    try {
+      const response = await fetch(`/api/accounts/${accountId}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch account details")
+      }
+      const data = await response.json()
+      setAccountDetails(data)
+      return data
+    } catch (err) {
+      console.error("Error fetching account details:", err)
+      setError("Error fetching account details: " + err.message)
+      return null
+    }
+  }
+
+  // Update User ID
+  const updateUserId = async () => {
+    try {
+      setLoading(true)
+      setError("")
+
+      // Check if user ID is empty
+      if (!userId.trim()) {
+        setError("User ID cannot be empty")
+        setLoading(false)
+        return false
+      }
+
+      // Update account with new user ID
+      const response = await fetch(`/api/accounts/${accountId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ UserID: userId.trim() }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to update User ID")
+      }
+
+      // Update account details state
+      const updatedAccount = await response.json()
+      setAccountDetails(updatedAccount.account)
+      setSuccess("User ID updated successfully")
+      setShowUserIdModal(false)
+
+      return true
+    } catch (err) {
+      setError("Error updating User ID: " + err.message)
+      return false
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Fetch progress data
@@ -273,6 +336,35 @@ export default function ProgressSignup({ accountId }) {
     }
   }
 
+  // Handle click on "Mark as Active" button - check for User ID
+  const handleMarkActiveClick = async () => {
+    try {
+      setError("")
+      setLoading(true)
+
+      // Get latest account details to check for User ID
+      const account = await fetchAccountDetails()
+      
+      if (!account) {
+        throw new Error("Failed to fetch account details")
+      }
+
+      // Check if User ID exists
+      if (!account.UserID) {
+        // Show modal to enter User ID
+        setShowUserIdModal(true)
+        setLoading(false)
+        return
+      }
+
+      // If User ID exists, proceed with marking account as active
+      await markAccountActive()
+    } catch (err) {
+      setError("Error updating account: " + err.message)
+      setLoading(false)
+    }
+  }
+
   // Mark Check Account as active
   const markAccountActive = async () => {
     try {
@@ -300,6 +392,14 @@ export default function ProgressSignup({ accountId }) {
       setError("Error updating progress: " + err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Handle User ID submission and then mark account as active
+  const handleUserIdSubmit = async () => {
+    const success = await updateUserId()
+    if (success) {
+      await markAccountActive()
     }
   }
 
@@ -336,12 +436,14 @@ export default function ProgressSignup({ accountId }) {
   // Manual refresh function that users can trigger if needed
   const refreshData = () => {
     fetchProgress()
+    fetchAccountDetails()
   }
 
   // Update countdown timer every second without full data reload
   useEffect(() => {
     // Initial data fetch (only once when component mounts)
     fetchProgress()
+    fetchAccountDetails()
 
     // Set up interval to update ONLY countdown timers and percentages every second
     const countdownIntervalId = setInterval(() => {
@@ -524,7 +626,9 @@ export default function ProgressSignup({ accountId }) {
                   recommendedTimes.firstListing &&
                   recommendedTimes.firstListing.remaining > 0 && (
                     <div className="mt-2">
-
+                      <p className="text-xs text-amber-600">
+                        Note: Completed {formatRemainingTimeWithSeconds(recommendedTimes.firstListing.remaining)} early
+                      </p>
                     </div>
                   )}
               </div>
@@ -615,7 +719,9 @@ export default function ProgressSignup({ accountId }) {
                   recommendedTimes.sellerAccount &&
                   recommendedTimes.sellerAccount.remaining > 0 && (
                     <div className="mt-2">
-
+                      <p className="text-xs text-amber-600">
+                        Note: Completed {formatRemainingTimeWithSeconds(recommendedTimes.sellerAccount.remaining)} early
+                      </p>
                     </div>
                   )}
               </div>
@@ -708,7 +814,9 @@ export default function ProgressSignup({ accountId }) {
                   recommendedTimes.checkAccount &&
                   recommendedTimes.checkAccount.remaining > 0 && (
                     <div className="mt-2">
-
+                      <p className="text-xs text-amber-600">
+                        Note: Reviewed {formatRemainingTimeWithSeconds(recommendedTimes.checkAccount.remaining)} early
+                      </p>
                     </div>
                   )}
               </div>
@@ -725,7 +833,7 @@ export default function ProgressSignup({ accountId }) {
             {progress?.seller_account_completed && progress?.check_account_status === "pending" && (
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
-                  onClick={markAccountActive}
+                  onClick={handleMarkActiveClick}
                   disabled={loading}
                   className={`py-2 px-4 rounded-md ${
                     loading
@@ -760,6 +868,48 @@ export default function ProgressSignup({ accountId }) {
           </div>
         </div>
       </div>
+
+      {/* User ID Modal */}
+      {showUserIdModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-4 md:p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">User ID Required</h2>
+            <p className="mb-4 text-gray-700">
+              A User ID is required before marking this account as active. Please enter a User ID for this account.
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="userId">
+                User ID
+              </label>
+              <input
+                id="userId"
+                type="text"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                className="border rounded-md px-3 py-2 w-full"
+                placeholder="Enter User ID"
+              />
+            </div>
+            
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <button
+                onClick={() => setShowUserIdModal(false)}
+                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md w-full sm:w-auto"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUserIdSubmit}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md w-full sm:w-auto"
+                disabled={loading}
+              >
+                {loading ? "Saving..." : "Save & Mark as Active"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -11,11 +11,14 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState(null);
   const [formData, setFormData] = useState({
     OrderIdAccount: '',
     FirstName: '',
@@ -221,6 +224,95 @@ export default function AccountsPage() {
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
 
+  // Open PicClick seller page in new tab
+  const openPicClickSeller = (userId) => {
+    if (userId) {
+      window.open(`https://picclick.es/seller/${userId}`, '_blank');
+    }
+  };
+
+  // Mark account as suspended
+  const suspendAccount = async (accountId) => {
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      
+      const response = await fetch(`/api/accounts/${accountId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ Suspended: true }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to suspend account');
+      }
+      
+      setSuccess(`Account ${accountId} suspended successfully`);
+      
+      // Refresh the accounts list
+      fetchAccounts();
+      
+    } catch (err) {
+      setError('Error suspending account: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show delete confirmation modal
+  const confirmDelete = (account) => {
+    setAccountToDelete(account);
+    setShowDeleteModal(true);
+  };
+
+  // Delete account
+  const deleteAccount = async () => {
+    if (!accountToDelete) return;
+    
+    try {
+      setLoading(true);
+      setError('');
+      
+      const response = await fetch(`/api/accounts/${accountToDelete.OrderIdAccount}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete account');
+      }
+      
+      setSuccess(`Account ${accountToDelete.OrderIdAccount} deleted successfully`);
+      setShowDeleteModal(false);
+      setAccountToDelete(null);
+      
+      // Refresh the accounts list
+      fetchAccounts();
+      
+    } catch (err) {
+      setError('Error deleting account: ' + err.message);
+      setShowDeleteModal(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Clear success message after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess('');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
   return (
     <div className="bg-white rounded-lg shadow p-4 md:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 sm:gap-0">
@@ -243,6 +335,12 @@ export default function AccountsPage() {
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
+        </div>
+      )}
+      
+      {success && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          {success}
         </div>
       )}
       
@@ -275,22 +373,16 @@ export default function AccountsPage() {
                   Order ID
                 </th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                   Email
                 </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                  Country
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Password
                 </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   User ID
                 </th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
-                </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                  Created
                 </th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -300,7 +392,7 @@ export default function AccountsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading && !accounts.length ? (
                 <tr>
-                  <td colSpan="8" className="px-3 sm:px-6 py-4 text-center">
+                  <td colSpan="6" className="px-3 sm:px-6 py-4 text-center">
                     <div className="flex justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
                     </div>
@@ -308,7 +400,7 @@ export default function AccountsPage() {
                 </tr>
               ) : accounts.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-3 sm:px-6 py-4 text-center text-gray-500">
+                  <td colSpan="6" className="px-3 sm:px-6 py-4 text-center text-gray-500">
                     No accounts found
                   </td>
                 </tr>
@@ -321,20 +413,12 @@ export default function AccountsPage() {
                           href={`/dashboard/account/${account.OrderIdAccount}`}
                           className="text-blue-600 hover:text-blue-800 hover:underline mr-2 text-xs sm:text-sm"
                         >
-                          {account.OrderIdAccount.substring(0, 8)}...
+                          {account.OrderIdAccount}
                         </Link>
                         <CopyButton text={account.OrderIdAccount} />
                       </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
-                      <div className="flex items-center">
-                        <span className="mr-2 truncate max-w-[100px] sm:max-w-none">
-                          {account.FirstName} {account.LastName}
-                        </span>
-                        <CopyButton text={`${account.FirstName} ${account.LastName}`} />
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <span className="mr-2 text-xs sm:text-sm truncate max-w-[150px] lg:max-w-none">
                           {account.Email}
@@ -342,16 +426,34 @@ export default function AccountsPage() {
                         <CopyButton text={account.Email} />
                       </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <span className="mr-2">{account.Country || '-'}</span>
-                        {account.Country && <CopyButton text={account.Country} />}
+                        <span className="mr-2 text-xs sm:text-sm font-mono">
+                          {account.Password}
+                        </span>
+                        <CopyButton text={account.Password} />
                       </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden lg:table-cell text-xs sm:text-sm">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <span className="mr-2">{account.UserID || '-'}</span>
-                        {account.UserID && <CopyButton text={account.UserID} />}
+                        {account.UserID ? (
+                          <>
+                            <a
+                              href={`https://picclick.es/seller/${account.UserID}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mr-2 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-xs sm:text-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                            >
+                              {account.UserID}
+                            </a>
+                            <CopyButton text={account.UserID} />
+                          </>
+                        ) : (
+                          <span className="mr-2 text-gray-400">-</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -365,16 +467,36 @@ export default function AccountsPage() {
                         {account.Suspended ? 'Suspended' : 'Active'}
                       </span>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs text-gray-500 hidden md:table-cell">
-                      {formatDate(account.created_at)}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
-                      <Link
-                        href={`/dashboard/account/${account.OrderIdAccount}`}
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        Edit
-                      </Link>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <div className="flex space-x-2">
+                        <Link
+                          href={`/dashboard/account/${account.OrderIdAccount}`}
+                          className="bg-blue-100 text-blue-700 hover:bg-blue-200 p-2 rounded"
+                          title="Edit Account"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                          </svg>
+                        </Link>
+                        <button
+                          onClick={() => suspendAccount(account.OrderIdAccount)}
+                          className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 p-2 rounded"
+                          title="Mark as Suspended"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => confirmDelete(account)}
+                          className="bg-red-100 text-red-700 hover:bg-red-200 p-2 rounded"
+                          title="Delete Account"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -591,6 +713,37 @@ export default function AccountsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && accountToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-4 md:p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Confirm Deletion</h2>
+            <p className="mb-6 text-gray-700">
+              Are you sure you want to delete account <strong>{accountToDelete.OrderIdAccount}</strong>? This action cannot be undone.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setAccountToDelete(null);
+                }}
+                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md w-full sm:w-auto"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteAccount}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md w-full sm:w-auto"
+                disabled={loading}
+              >
+                {loading ? 'Deleting...' : 'Delete Account'}
+              </button>
+            </div>
           </div>
         </div>
       )}

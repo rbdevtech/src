@@ -158,6 +158,13 @@ export default function AccountDetailPage() {
     }
   };
 
+  // Open PicClick seller page
+  const openPicClickSeller = (userId) => {
+    if (userId) {
+      window.open(`https://picclick.es/seller/${userId}`, '_blank');
+    }
+  };
+
   if (loading && !account) {
     return (
       <div className="bg-white rounded-lg shadow p-6 flex justify-center items-center h-96">
@@ -326,12 +333,35 @@ export default function AccountDetailPage() {
                 </div>
               </div>
               
-              <CopyInput
-                label="User ID"
-                name="UserID"
-                value={formData.UserID}
-                onChange={handleInputChange}
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  User ID
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="UserID"
+                    value={formData.UserID}
+                    onChange={handleInputChange}
+                    className="border rounded-md px-3 py-2 w-full pr-10"
+                  />
+                  {formData.UserID && (
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center">
+                      <a
+                        href={`https://picclick.es/seller/${formData.UserID}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mr-2 text-blue-600 hover:text-blue-800"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Open on PicClick"
+                      >
+                        <i className="fas fa-external-link-alt"></i>
+                      </a>
+                      <CopyButton text={formData.UserID} />
+                    </div>
+                  )}
+                </div>
+              </div>
               
               <div>
                 <label className="flex items-center">
@@ -352,7 +382,7 @@ export default function AccountDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-500">Order ID</h3>
               <div className="mt-1 flex items-center">
-                <p className="mr-2">{account.OrderIdAccount}</p>
+                <p className="mr-2 break-all">{account.OrderIdAccount}</p>
                 <CopyButton text={account.OrderIdAccount} />
               </div>
             </div>
@@ -360,7 +390,7 @@ export default function AccountDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-500">Email</h3>
               <div className="mt-1 flex items-center">
-                <p className="mr-2">{account.Email}</p>
+                <p className="mr-2 break-all">{account.Email}</p>
                 <CopyButton text={account.Email} />
               </div>
             </div>
@@ -378,7 +408,7 @@ export default function AccountDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-500">Password</h3>
               <div className="mt-1 flex items-center">
-                <p className="mr-2">{account.Password}</p>
+                <p className="mr-2 break-all">{account.Password}</p>
                 <CopyButton text={account.Password} />
               </div>
             </div>
@@ -394,8 +424,22 @@ export default function AccountDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-500">User ID</h3>
               <div className="mt-1 flex items-center">
-                <p className="mr-2">{account.UserID || '-'}</p>
-                {account.UserID && <CopyButton text={account.UserID} />}
+                {account.UserID ? (
+                  <>
+                    <a
+                      href={`https://picclick.es/seller/${account.UserID}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mr-2 text-blue-600 hover:text-blue-800 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {account.UserID}
+                    </a>
+                    <CopyButton text={account.UserID} />
+                  </>
+                ) : (
+                  <p className="mr-2">-</p>
+                )}
               </div>
             </div>
             
@@ -429,23 +473,23 @@ export default function AccountDetailPage() {
       
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-4 md:p-6 w-full max-w-md">
             <h2 className="text-xl font-semibold mb-4">Confirm Deletion</h2>
-            <p className="mb-6">
+            <p className="mb-6 break-all">
               Are you sure you want to delete account <strong>{account.OrderIdAccount}</strong>? This action cannot be undone.
             </p>
             
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md"
+                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md w-full sm:w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteAccount}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md"
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md w-full sm:w-auto"
                 disabled={loading}
               >
                 {loading ? 'Deleting...' : 'Delete Account'}
